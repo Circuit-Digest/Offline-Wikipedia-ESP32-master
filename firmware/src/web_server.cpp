@@ -18,7 +18,7 @@ static const size_t WEB_IMG_BUF_SIZE = 128 * 1024;
 
 // HTML template parts for responsive, fast web interface
 static const char HTML_HEADER[] PROGMEM = R"rawliteral(<!DOCTYPE html>
-<html lang="af">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -60,7 +60,7 @@ function onSearchInput(val) {
       .then(res => res.json())
       .then(data => {
         if (!data || data.length === 0) {
-          box.innerHTML = '<div class="sug-item">Geen resultate gevind nie</div>';
+          box.innerHTML = '<div class="sug-item">No results found</div>';
           box.style.display = "block";
           return;
         }
@@ -86,7 +86,7 @@ document.addEventListener('click', (e) => {
   <div class="header-wrap">
     <a href="/" class="logo">📖 Wikipedia</a>
     <div class="search-box">
-      <input type="search" placeholder="Soek op Wikipedia..." autocomplete="off" oninput="onSearchInput(this.value)">
+      <input type="search" placeholder="Search Wikipedia..." autocomplete="off" oninput="onSearchInput(this.value)">
       <div id="suggestions"></div>
     </div>
   </div>
@@ -97,7 +97,7 @@ document.addEventListener('click', (e) => {
 static const char HTML_FOOTER[] PROGMEM = R"rawliteral(
 </main>
 <div class="footer">
-  ESP32-S3 Offline Wikipedia &bull; Geen internetverbinding nodig nie
+  ESP32-S3 Offline Wikipedia &bull; No internet connection required
 </div>
 </body>
 </html>
@@ -106,14 +106,14 @@ static const char HTML_FOOTER[] PROGMEM = R"rawliteral(
 static void handleRoot() {
     String html = FPSTR(HTML_HEADER);
     html += "<div class=\"article-card\">";
-    html += "<h1>Welkom by Offline Wikipedia</h1>";
-    html += "<p>Hierdie databasis word van die microSD-kaart op jou <b>ESP32-S3</b> bedien sonder enige internetverbinding.</p>";
+    html += "<h1>Welcome to Offline Wikipedia</h1>";
+    html += "<p>This database is served from the microSD card on your <b>ESP32-S3</b> without any internet connection.</p>";
     html += "<div style=\"background: var(--bg); padding: 15px; border-radius: 6px; margin: 15px 0;\">";
-    html += "<p><b>Databasis:</b> " + wikiDbName() + "</p>";
-    html += "<p><b>Totale Artikels:</b> " + String(wikiDbArticleCount()) + "</p>";
-    html += "<p><b>Beelde Beskikbaar:</b> " + String(wikiDbImagesAvailable() ? "Ja (Kwaliteit Foto's & Diagramme)" : "Nee") + "</p>";
+    html += "<p><b>Database:</b> " + wikiDbName() + "</p>";
+    html += "<p><b>Total Articles:</b> " + String(wikiDbArticleCount()) + "</p>";
+    html += "<p><b>Images Available:</b> " + String(wikiDbImagesAvailable() ? "Yes (Photos & Diagrams)" : "No") + "</p>";
     html += "</div>";
-    html += "<p>Gebruik die soekbalk boaan om enige onderwerp op te soek (bv. <i>Suid-Afrika</i>, <i>Kaapstad</i>, <i>Nelson Mandela</i>).</p>";
+    html += "<p>Use the search bar above to look up any topic.</p>";
     html += "</div>";
     html += FPSTR(HTML_FOOTER);
 
@@ -171,7 +171,7 @@ static void handleWikiArticle() {
 
     ArticleResult ar = wikiDbLoadArticle(article_id, block_num);
     if (!ar.found) {
-        server.send(404, "text/html; charset=utf-8", "<h1>Artikel nie gevind nie</h1>");
+        server.send(404, "text/html; charset=utf-8", "<h1>Article not found</h1>");
         return;
     }
 
@@ -186,13 +186,13 @@ static void handleWikiArticle() {
     if (ar.num_blocks > 1) {
         html += "<div class=\"nav-pages\">";
         if (block_num > 0) {
-            html += "<a class=\"btn\" href=\"/wiki/" + String(article_id) + "?page=" + String(block_num - 1) + "\">&larr; Vorige Bladsy</a>";
+            html += "<a class=\"btn\" href=\"/wiki/" + String(article_id) + "?page=" + String(block_num - 1) + "\">&larr; Previous Page</a>";
         } else {
             html += "<span></span>";
         }
-        html += "<span>Bladsy " + String(block_num + 1) + " van " + String(ar.num_blocks) + "</span>";
+        html += "<span>Page " + String(block_num + 1) + " of " + String(ar.num_blocks) + "</span>";
         if (block_num + 1 < ar.num_blocks) {
-            html += "<a class=\"btn\" href=\"/wiki/" + String(article_id) + "?page=" + String(block_num + 1) + "\">Volgende Bladsy &rarr;</a>";
+            html += "<a class=\"btn\" href=\"/wiki/" + String(article_id) + "?page=" + String(block_num + 1) + "\">Next Page &rarr;</a>";
         } else {
             html += "<span></span>";
         }

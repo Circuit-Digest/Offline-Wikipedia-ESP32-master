@@ -1,130 +1,170 @@
-# ESP32 Offline Wikipedia Server 🌐 SD Card Database with Kiwix & LZ4
+# Offline Wikipedia on ESP32-S3
 
-[![PlatformIO](https://img.shields.io/badge/PlatformIO-Supported-orange.svg)](https://platformio.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Framework: Arduino](https://img.shields.io/badge/Framework-Arduino-blue.svg)](https://www.arduino.cc/)
+Run a complete, searchable copy of Wikipedia on a low-cost **ESP32-S3** board, with **no internet connection required**. The ESP32 hosts its own Wi-Fi access point and web server, serving articles (and images) straight from a microSD card. Connect with any phone, tablet, or laptop and browse.
 
-Host a fully functional, offline instance of Wikipedia on an **ESP32**, **ESP32-S3**, or **ESP32-CAM** microcontroller using compressed Kiwix `.zim` data. 
+This is made possible by [Kiwix](https://www.kiwix.org/), a non-profit that makes free knowledge available offline through open-source ZIM archives.
 
-By leveraging custom LZ4 decompression, optimized binary search indexes, and lightweight JPEG thumbnails, this project allows you to serve millions of Wikipedia articles directly from a microSD card over a local Wi-Fi Access Point—**zero internet connection required.**
-
----
-
-## 📌 Features
-
-* **100% Offline Access:** Creates its own local Wi-Fi Access Point (`192.168.4.1`) to serve web pages to any smartphone, tablet, or laptop.
-* **On-the-Fly LZ4 Decompression:** Fast, real-time article un-chunking directly in PSRAM.
-* **Optimized Image Support:** Custom Python preprocessor resizes and encodes thumbnails ($480 \times 320$) for fast rendering on microcontroller hardware.
-* **Ultra-Fast Binary Search:** Native indexing allows instant article retrieval without scanning the entire SD card.
-* **Broad Hardware Support:** Configurable for standard ESP32 boards (WROVER), ESP32-S3 variants, and cheap ESP32-CAM modules.
+> Original tutorial: [Circuit Digest - How to Build an Offline Wikipedia Using ESP32](https://circuitdigest.com/)
+> Repository: https://github.com/Circuit-Digest/Offline-Wikipedia-ESP32-master
 
 ---
 
-## 🛠️ Hardware Requirements
+## Features
 
-| Component | Recommendation / Requirement | Notes |
-| :--- | :--- | :--- |
-| **Microcontroller** | ESP32-S3, ESP32-WROVER, or ESP32-CAM | **PSRAM is mandatory.** Standard WROOM-32 without PSRAM is not supported. |
-| **PSRAM** | 2 MB Minimum, **8 MB Recommended** | Required for LZ4 decompression buffers and HTTP dynamic allocations. |
-| **Storage** | microSD Card (Class 10 / FAT32) | Size depends on the `.zim` dump used (16 GB - 64 GB recommended). |
-| **SD Adapter** | SPI SD Module or Built-in SDMMC | Integrated slot on ESP32-CAM or ESP32-S3 DevKit. |
-
----
-
-## 💻 Software Prerequisites
-
-* [PlatformIO IDE](https://platformio.org/) (VS Code Extension)
-* [Python 3.8+](https://www.python.org/) (For running the database preprocessor script)
-* A Kiwix `.zim` archive file (e.g., Simple English Wikipedia from [Kiwix Downloads](https://download.kiwix.org/zim/wikipedia/))
+- Fully offline: no cloud, no router, no internet
+- Built-in Wi-Fi access point (`Wikipedia-Offline`), open network
+- Search bar with live article suggestions
+- Full article text, with optional images and diagrams
+- Works with any language or topic Kiwix provides (Wikipedia, physics, mathematics, chess, football, etc.)
+- Serial Monitor remains active for diagnostics
 
 ---
 
-## 🚀 Quick Start Guide
+## Hardware Required
 
-### Step 1: Preprocess the Kiwix `.zim` File
+| Component | Notes |
+|-----------|-------|
+| ESP32-S3 board with microSD slot | e.g. ESP32-S3 CAM module. **ESP32-S3 is required as the firmware expects an ESP32-S3 board** |
+| microSD card | 16 GB or 32 GB recommended. A 2-4 GB card works if the data fits |
+| USB data cable | For flashing the firmware |
+| PC with VS Code + PlatformIO | Used for preprocessing and flashing |
 
-1. Download your desired `.zim` file from Kiwix.
-2. Run the included Python preprocessor script to convert, resize images, and generate the LZ4 index database structure for the ESP32:
+---
+
+## Step-by-Step Setup
+
+### Step 1: Download the correct ZIM file
+
+Go to the Kiwix Wikipedia dump page and pick a file whose size fits your microSD card.
+
+File names follow a pattern such as `wikipedia_en-simple_all_maxi_2026-09.zim`:
+
+| Tag | Meaning |
+|-----|---------|
+| `en`, `af`, `ru`, `fr`, ... | Language code (English, Afrikaans, Russian, French, etc.) |
+| `simple` | Simple English Wikipedia: easier vocabulary, fewer articles, much smaller file |
+| `all` | General articles across all topics, not a single subject |
+| `maxi` | Full version with complete text and images |
+| `nopic` | Text only, no pictures, much smaller |
+| `mini` | Lead/intro paragraphs of articles only |
+| `2026-XX` | Year and month the snapshot was taken |
+
+Topic-specific archives (physics, mathematics, football, chess, ...) are also available. If you don't want images, choose a `nopic` file.
+
+### Step 2: Clone the repository
 
 ```bash
-python preprocessor/build_wiki_db.py --all-jpeg --thumb-size 480x320 "path/to/wikipedia.zim" preprocessor/output_wiki
+git clone https://github.com/Circuit-Digest/Offline-Wikipedia-ESP32-master.git
+cd Offline-Wikipedia-ESP32-master
 ```
 
-3. Copy the output folder structure generated in `preprocessor/output_wiki` directly onto the root directory of your FAT32-formatted microSD card.
-4. Insert the microSD card into your ESP32's SD slot.
+All following commands are run from the root of the cloned repository (the tutorial uses VS Code with PlatformIO).
 
----
+### Step 3: Preprocess the ZIM file
 
-### Step 2: Configure and Flash Hardware
+This re-compresses the ZIM contents so the ESP32 can read them efficiently. It extracts all articles, renders images/diagrams into `.dat` chunks, and generates the index files.
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/your-username/ESP32-Offline-Wikipedia.git
-   cd ESP32-Offline-Wikipedia
-   ```
+The default thumbnail size is `320x212`. The example below uses `480x320` for sharper images.
 
-2. Open the project in **PlatformIO**.
-
-3. Select your target environment in `platformio.ini` (e.g., `esp32-s3-devkitc-1` or `esp32cam`).
-
-4. Verify or adjust the SD card pin mappings in `include/config.h`:
-
-```cpp
-// Example: Standard ESP32 SPI Pinout
-#define SD_CS   5
-#define SD_MOSI 23
-#define SD_MISO 19
-#define SD_SCK  18
+```powershell
+& "C:\Users\<YourUser>\.platformio\penv\Scripts\python.exe" preprocessor\build_wiki_db.py --all-jpeg --thumb-size 480x320 "C:\Users\<YourUser>\Downloads\wikipedia_en-simple_all_maxi_2026-09.zim" preprocessor\output_en_wiki
 ```
 
-5. Build and upload the code to your ESP32 board.
+- Replace `<YourUser>` and the `.zim` path with your own.
+- Processing can take a while, depending on the ZIM size.
+- The output folder (`output_en_wiki`) can be renamed to match your language, e.g. `output_af_wiki` for Afrikaans.
 
----
+### Step 4: Copy the data to the microSD card
 
-## 📱 How to Use
+1. Plug the microSD card into your PC and **format it as FAT32** (Windows: right-click the drive > Format > FAT32).
+2. Create a folder named `wiki` in the root of the card.
+3. Copy **all files** from `preprocessor\output_en_wiki\` into `/wiki/`.
 
-1. Power on your ESP32 board.
-2. On your phone, laptop, or computer, search for the Wi-Fi Access Point named **`ESP32-Wikipedia`**.
-3. Connect to the network (no internet warning is normal).
-4. Open your web browser and navigate to:
-   ```text
-   http://192.168.4.1
-   ```
-5. Search for any article and enjoy your pocket-sized off-grid encyclopedia!
+The card should look like this:
 
----
-
-## ⚙️ Board-Specific Configuration Notes
-
-### ESP32-S3 Setup
-Ensure Octal/Quad PSRAM flags are properly matched in your `platformio.ini`:
-```ini
-[env:esp32-s3-devkitc-1]
-platform = espressif32
-board = esp32-s3-devkitc-1
-framework = arduino
-board_build.arduino.memory_type = qio_opi
-build_flags = 
-    -D BOARD_HAS_PSRAM
-    -D CONFIG_ESP32S3_SPIRAM_SUPPORT
+```
+SD Card Root/
+└── wiki/
+    ├── index.bin
+    ├── sparse_index.bin
+    ├── id_index.bin
+    ├── index_meta.txt
+    ├── articles_0000.dat
+    ├── articles_0001.dat
+    ...
+    ├── img_index.bin
+    ├── img_meta.txt
+    ├── img_0000.dat
+    ├── img_0001.dat
+    ...
 ```
 
-### ESP32-CAM Setup
-The ESP32-CAM uses the onboard **SDMMC interface** instead of standard SPI:
-* Use `#include "SD_MMC.h"` in your code instead of `SD.h`.
-* Connect **GPIO 0 to GND** while flashing, then disconnect and press RESET.
-* Standard pin configuration uses 1-bit or 4-bit bus mode (Note: GPIO 4 is shared with the white flash LED).
+Insert the card into the microSD slot on the ESP32-S3 board.
+
+### Step 5: Flash the web server firmware
+
+Connect the ESP32-S3 over USB and run:
+
+```powershell
+cd firmware
+$env:PYTHONIOENCODING="utf-8"
+& "C:\Users\<YourUser>\.platformio\penv\Scripts\pio.exe" run -e s3-cam-web -t upload
+```
+
+No changes are needed. A success message appears when flashing completes. If it fails, check that you are using an **ESP32-S3** board, as the firmware expects one.
+
+### Step 6: Verify the boot
+
+Open the Serial Monitor:
+
+```powershell
+& "C:\Users\<YourUser>\.platformio\penv\Scripts\pio.exe" device monitor
+```
+
+A healthy boot looks like this (article counts vary by ZIM file):
+
+```
+[wiki_db] Initialising storage...
+[wiki_db] Setting custom SD_MMC pins: CLK=39, CMD=38, D0=40
+[wiki_db] SD_MMC mounted successfully (1-bit mode)!
+[wiki_db] Database ready: 129909 articles
+[wiki_db] Images: 129909 available
+```
+
+### Step 7: Connect and browse
+
+1. Power on the ESP32-S3.
+2. On your phone, tablet, or laptop, connect to the Wi-Fi network **`Wikipedia-Offline`** (open network, no password).
+3. Open a browser and go to **http://192.168.4.1/**
+
+You'll see the "Welcome to Offline Wikipedia" page with the total article count. Start typing in the search bar to see matching articles, then click one to read the full content (text and images, or text only if you used a `nopic` file).
 
 ---
 
-## 🤝 Contributing
+## Troubleshooting
 
-Contributions, bug reports, and optimizations are welcome! Feel free to open an issue or submit a pull request.
+| Problem | Likely cause |
+|---------|--------------|
+| Firmware upload fails | Board is not an ESP32-S3 |
+| SD card not mounted in Serial Monitor | Card not formatted as FAT32, or files not inside `/wiki/` |
+| Not enough space on card | ZIM output is larger than the card; use `simple`, `nopic`, or `mini`, or a bigger card |
+| Can't open the page | Confirm you're connected to `Wikipedia-Offline` and use `http://192.168.4.1/` |
 
 ---
 
-## 📜 License & Acknowledgments
+## Ideas for Extension
 
-* Distributed under the **MIT License**.
-* Special thanks to the **Kiwix Project** for making open knowledge accessible worldwide.
-* Powered by [LZ4 Compression](https://github.com/lz4/lz4).
+- Add a **TFT display** to read articles directly on the device instead of through a browser
+- Integrate an **offline text-to-speech** system so articles are read aloud
+- Build an emergency survival kit or off-grid educational tool
+
+---
+
+## Credits
+
+- [Kiwix](https://www.kiwix.org/) for the open ZIM archives
+- [Circuit Digest](https://circuitdigest.com/) for the original tutorial and code
+
+## License
+
+Check the repository's license file for details. Wikipedia content is available under its own open licenses (CC BY-SA).
